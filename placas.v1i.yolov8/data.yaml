@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['placas']
+
+roboflow:
+  workspace: bithacker
+  project: placas-puqb6-ag137
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/bithacker/placas-puqb6-ag137/dataset/1
