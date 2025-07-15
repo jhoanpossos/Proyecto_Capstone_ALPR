@@ -60,51 +60,52 @@ def verificar_placa_registrada(conn, placa):
         print(f"Error al verificar la placa: {e}")
         return None
 
-def mostrar_interfaz_registro(conn, placa):
-    """
-    Muestra una ventana para registrar un nuevo vehículo.
-    """
-    def registrar():
-        nombre = entry_nombre.get()
-        marca = entry_marca.get()
-        modelo = entry_modelo.get()
-        color = entry_color.get()
+# SE COMENTA LA INTERFAZ GRAFICA QUE SE MOSTRABA ANTERIORMENTE
+# def mostrar_interfaz_registro(conn, placa):
+#     """
+#     Muestra una ventana para registrar un nuevo vehículo.
+#     """
+#     def registrar():
+#         nombre = entry_nombre.get()
+#         marca = entry_marca.get()
+#         modelo = entry_modelo.get()
+#         color = entry_color.get()
 
-        if not all([nombre, marca, modelo, color]):
-            messagebox.showerror("Error", "Por favor, completa todos los campos.")
-            return
+#         if not all([nombre, marca, modelo, color]):
+#             messagebox.showerror("Error", "Por favor, completa todos los campos.")
+#             return
 
-        try:
-            cursor = conn.cursor()
-            query = "INSERT INTO VehiculosRegistrados (Placa, NombreCompleto, Marca, Modelo, Color) VALUES (?, ?, ?, ?, ?)"
-            cursor.execute(query, (placa, nombre, marca, modelo, color))
-            conn.commit()
-            messagebox.showinfo("Éxito", f"Vehículo con placa '{placa}' registrado exitosamente.")
-            ventana.destroy()
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al registrar el vehículo: {e}")
+#         try:
+#             cursor = conn.cursor()
+#             query = "INSERT INTO VehiculosRegistrados (Placa, NombreCompleto, Marca, Modelo, Color) VALUES (?, ?, ?, ?, ?)"
+#             cursor.execute(query, (placa, nombre, marca, modelo, color))
+#             conn.commit()
+#             messagebox.showinfo("Éxito", f"Vehículo con placa '{placa}' registrado exitosamente.")
+#             ventana.destroy()
+#         except Exception as e:
+#             messagebox.showerror("Error", f"Error al registrar el vehículo: {e}")
 
-    ventana = tk.Tk()
-    ventana.title("Registro de Vehículo")
-    ventana.geometry("400x300")
+#     ventana = tk.Tk()
+#     ventana.title("Registro de Vehículo")
+#     ventana.geometry("400x300")
     
-    tk.Label(ventana, text=f"Placa detectada: {placa}", font=("Arial", 14)).pack(pady=10)
+#     tk.Label(ventana, text=f"Placa detectada: {placa}", font=("Arial", 14)).pack(pady=10)
     
-    tk.Label(ventana, text="Nombre del dueño:").pack()
-    entry_nombre = tk.Entry(ventana, width=30)
-    entry_nombre.pack()
+#     tk.Label(ventana, text="Nombre del dueño:").pack()
+#     entry_nombre = tk.Entry(ventana, width=30)
+#     entry_nombre.pack()
 
-    tk.Label(ventana, text="Marca del vehículo:").pack()
-    entry_marca = tk.Entry(ventana, width=30)
-    entry_marca.pack()
+#     tk.Label(ventana, text="Marca del vehículo:").pack()
+#     entry_marca = tk.Entry(ventana, width=30)
+#     entry_marca.pack()
 
-    tk.Label(ventana, text="Modelo del vehículo:").pack()
-    entry_modelo = tk.Entry(ventana, width=30)
-    entry_modelo.pack()
+#     tk.Label(ventana, text="Modelo del vehículo:").pack()
+#     entry_modelo = tk.Entry(ventana, width=30)
+#     entry_modelo.pack()
 
-    tk.Label(ventana, text="Color del vehículo:").pack()
-    entry_color = tk.Entry(ventana, width=30)
-    entry_color.pack()
+#     tk.Label(ventana, text="Color del vehículo:").pack()
+#     entry_color = tk.Entry(ventana, width=30)
+#     entry_color.pack()
     
-    tk.Button(ventana, text="Registrar", command=registrar).pack(pady=20)
-    ventana.mainloop()
+#     tk.Button(ventana, text="Registrar", command=registrar).pack(pady=20)
+#     ventana.mainloop()
