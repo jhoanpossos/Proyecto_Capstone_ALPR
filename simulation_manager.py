@@ -11,9 +11,7 @@ class SimulationManager:
                                        if os.path.isdir(os.path.join(self.base_path, d))]
         if not self.available_environments:
             raise FileNotFoundError(f"No se encontraron directorios de entornos en '{self.base_path}'")
-        print(f"✅ Gestor de Simulación inicializado. {len(self.available_environments)} entornos encontrados.")
         self.current_env_name = None
-        self.images = {}
         self.sorted_images_by_intensity = []
 
     def load_environment(self, env_name):
@@ -21,23 +19,21 @@ class SimulationManager:
             raise ValueError(f"El entorno '{env_name}' no existe.")
         self.current_env_name = env_name
         env_path = os.path.join(self.base_path, env_name)
-        self.images = {}
+        images = {}
         for filename in os.listdir(env_path):
             if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
                 path = os.path.join(env_path, filename)
                 img = cv2.imread(path)
-                if img is not None:
-                    self.images[filename] = img
-        if len(self.images) < 2:
-            raise ValueError(f"El entorno '{env_name}' debe contener al menos 2 imágenes.")
-        self.sorted_images_by_intensity = sorted(self.images.values(), key=lambda img: np.mean(cv2.cvtColor(img, cv2.COLOR_BGR2HSV)[:, :, 2]))
+                if img is not None: images[filename] = img
+        if len(images) < 2:
+            raise ValueError(f"El entorno '{env_name}' debe tener al menos 2 imágenes.")
+        self.sorted_images_by_intensity = sorted(images.values(), key=lambda img: np.mean(cv2.cvtColor(img, cv2.COLOR_BGR2HSV)[:, :, 2]))
 
     def get_random_environment_name(self):
         return random.choice(self.available_environments)
 
     def simulate_lighting(self, intensity, activation_threshold=0.25):
-        if not self.current_env_name:
-            raise RuntimeError("Carga un entorno con 'load_environment()' primero.")
+        if not self.current_env_name: raise RuntimeError("Carga un entorno primero.")
         intensity = np.clip(float(intensity), 0.0, 1.0)
         darkest_img = self.sorted_images_by_intensity[0]
         headlight_img = self.sorted_images_by_intensity[1]

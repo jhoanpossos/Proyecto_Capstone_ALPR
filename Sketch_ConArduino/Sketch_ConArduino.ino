@@ -1,34 +1,38 @@
 #include <Servo.h>
 
-// Crear un objeto Servo
 Servo myServo;
-
-// Pin al que está conectado el servo
 #define SERVO_PIN 9
+#define FLASH_PIN 10 // Un pin PWM para el LED/Flash
 
 void setup() {
-  // Inicializar el servo en el pin especificado
   myServo.attach(SERVO_PIN);
-
-  // Configurar comunicación serial
+  pinMode(FLASH_PIN, OUTPUT);
   Serial.begin(9600);
-  Serial.println("Arduino listo para recibir comandos.");
+  Serial.println("Arduino listo.");
 }
 
 void loop() {
-  // Verificar si hay datos disponibles en el puerto serial
   if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n'); // Leer el comando enviado por Python
+    String command = Serial.readStringUntil('\n');
+    command.trim();
 
-    // Comando para abrir la barrera
+    // Lógica para abrir la barrera (la que ya tienes)
     if (command == "OPEN") {
-      Serial.println("Barrera levantada.");
-      myServo.write(90); // Levantar la barrera (90 grados)
-      delay(10000);      // Esperar 10 segundos
-      myServo.write(0);  // Bajar la barrera (0 grados)
-      Serial.println("Barrera bajada.");
+      Serial.println("Comando OPEN recibido. Abriendo barrera.");
+      myServo.write(90); 
+      delay(10000);      
+      myServo.write(0);  
+      Serial.println("Barrera cerrada.");
+    }
+    
+    // Lógica NUEVA para controlar el flash
+    if (command.startsWith("SET_FLASH:")) {
+      // Extrae el valor numérico después de "SET_FLASH:"
+      int power = command.substring(10).toInt();
+      // Aplica el valor al pin del flash (0-255)
+      analogWrite(FLASH_PIN, power);
+      Serial.print("Potencia de flash ajustada a: ");
+      Serial.println(power);
     }
   }
 }
-
-

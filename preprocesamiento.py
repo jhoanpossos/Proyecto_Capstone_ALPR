@@ -4,7 +4,6 @@ import pytesseract
 import pandas as pd
 import re
 
-# Asegurarse de que Python sepa dónde encontrar Tesseract en Ubuntu
 pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract'
 
 def preprocesar_placa(roi):
@@ -15,12 +14,12 @@ def preprocesar_placa(roi):
             gauss, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2
         )
         return umbral
-    except Exception as e:
-        print(f"Error durante el preprocesamiento de la placa: {e}")
+    except Exception:
         return None
 
 def detectar_texto(img_preprocesada):
     try:
+        if img_preprocesada is None: return None, 0
         config = "--psm 8 --oem 3"
         data = pytesseract.image_to_data(img_preprocesada, config=config, output_type=pytesseract.Output.DATAFRAME)
         data = data[data.conf > 0]
@@ -32,6 +31,5 @@ def detectar_texto(img_preprocesada):
             return texto_normalizado, confianza_promedio
         else:
             return None, 0
-    except Exception as e:
-        print(f"Error durante la detección de texto con Tesseract: {e}")
+    except Exception:
         return None, 0
