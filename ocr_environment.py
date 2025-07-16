@@ -10,7 +10,7 @@ from ultralytics import YOLO
 class OCREnvironment(gym.Env):
     def __init__(self):
         super(OCREnvironment, self).__init__()
-        self.sim_manager = SimulationManager(environments_base_path='entornos/')
+        self.sim_manager = SimulationManager(environments_base_path='sistema_control_adaptativo/entornos/')
         self.fuzzy_controller = FuzzyController()
         self.yolo_model = YOLO("runs/detect/placas_v14/weights/best.pt")
         self.action_space = spaces.Box(low=np.array([10, 51, 10, 51]), high=np.array([50, 90, 50, 90]), dtype=np.float32)
