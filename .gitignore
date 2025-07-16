@@ -1,19 +1,11 @@
+# .gitignore (Versión permisiva)
+
 # Ignorar carpetas de caché de Python
 __pycache__/
 
-# Ignorar entornos virtuales
-ocr_env/
+# Ignorar carpetas de entorno de Conda
+/ocr_env/
+/alpr_env_final/
 
-# Ignorar archivos de sistema
+# Ignorar archivos específicos del sistema operativo
 .DS_Store
-
-# Ignorar carpetas de resultados y salidas
-resultados_*/
-runs/
-ppo_tensorboard/
-
-# Ignorar archivos generados
-*.zip
-*.pdf
-*.png
-*.log
