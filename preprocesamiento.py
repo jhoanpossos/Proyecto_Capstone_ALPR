@@ -1,4 +1,3 @@
-
 import cv2
 import pytesseract
 import pandas as pd

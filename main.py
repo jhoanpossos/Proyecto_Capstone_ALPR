@@ -6,17 +6,15 @@ from ultralytics import YOLO
 from stable_baselines3 import PPO
 
 # --- Importaciones de nuestros módulos ---
-# Se importa todo desde tu archivo, que ahora es el núcleo del control y la simulación
-from arduino_python import FuzzyController, conectar_arduino, enviar_comando_arduino, cerrar_conexion_arduino, actualizar_y_manejar_eventos_simulador
+from arduino_python import FuzzyController, conectar_arduino, enviar_comando_arduino, cerrar_conexion_arduino, actualizar_y_manejar_eventos_simulador, log_messages
 from database_sql import conectar_sql_server, verificar_placa_registrada, guardar_en_base_de_datos
-from preprocesamiento import preprocesar_placa, detectar_texto
+from preprocesamiento import detectar_texto
 from simulation_manager import SimulationManager
 
-# --- 1. SETUP ---
-print("⚙️  Iniciando sistema en MODO SIMULACIÓN...")
-
+# --- SETUP ---
+print("⚙️  Iniciando sistema con Agente Experto...")
 try:
-    agente_ppo = PPO.load("sistema_control_adaptativo/agentes_entrenados/ppo_fuzzy_ocr_controller.zip")
+    agente_ppo = PPO.load("sistema_control_adaptativo/agentes_entrenados/ppo_agente_experto.zip")
     yolo_model = YOLO("runs/detect/placas_v14/weights/best.pt")
     fuzzy_controller = FuzzyController()
     sim_manager = SimulationManager(environments_base_path='sistema_control_adaptativo/entornos/')
@@ -26,75 +24,81 @@ except Exception as e:
     exit()
 
 conn = conectar_sql_server()
-# Esta función inicia el Arduino real O la simulación visual
-arduino = conectar_arduino()
+arduino = conectar_arduino() 
+if conn is None: exit()
 
-if conn is None or arduino is None:
-    print("❌ Finalizando por error de conexión.")
-    exit()
-
-# --- 2. BUCLE PRINCIPAL DE SIMULACIÓN ---
+# --- BUCLE PRINCIPAL ---
 running = True
-# Variables para mantener el estado de la visualización
-display_frame = np.zeros((600, 800, 3), dtype="uint8") # Fondo por defecto
-roi_to_display = None
-
-print("🚀 Sistema listo. Presiona 'D' para simular o 'Q' para salir.")
+display_frame, roi_to_display = None, None
+log_messages[:] = ["Presiona 'D' para simular, 'Q' para salir."]
+print("🚀 Sistema listo.")
 
 while running:
-    # La función del módulo arduino ahora maneja el refresco de la ventana y los eventos de salida
     running = actualizar_y_manejar_eventos_simulador(display_frame, roi_to_display)
-
-    # El bucle espera 20ms por si se presiona una tecla
     key = cv2.waitKey(20) & 0xFF
 
-    # Activar el ciclo de control con la tecla 'd'
     if key == ord('d'):
+        roi_to_display = None
         
-        # --- CICLO DE CONTROL INTELIGENTE SIMULADO ---
         env_name = sim_manager.get_random_environment_name()
         sim_manager.load_environment(env_name)
+        log_messages[:] = [f"🚗 Vehículo en entorno: '{env_name}'"]
         
-        # Usamos la imagen con faros como el "frame" inicial que el sistema analiza
         initial_frame = sim_manager.sorted_images_by_intensity[1].copy()
-        display_frame = cv2.resize(initial_frame, (800, 600)) # La mostramos como fondo
+        display_frame = initial_frame.copy()
         
-        # ---- Lógica de IA ----
+        log_messages.append("--- Iniciando Diagnóstico ---")
+        
+        # --- FUNCIÓN AUXILIAR MEJORADA ---
+        def get_ocr_results_from_image(image):
+            """Ahora devuelve texto y confianza."""
+            results = yolo_model(image, verbose=False)
+            if results and results[0].boxes:
+                box = results[0].boxes[0]
+                roi = image[int(box.xyxy[0][1]):int(box.xyxy[0][3]), int(box.xyxy[0][0]):int(box.xyxy[0][2])]
+                texto, confianza = detectar_texto(roi)
+                # Devolvemos el texto y la confianza. Si son None, se convierten en "" y 0.
+                return texto or "", confianza or 0, roi
+            return "", 0, None
+
+        # Sondeo Flash Bajo
+        texto_bajo, conf_bajo, _ = get_ocr_results_from_image(sim_manager.simulate_lighting(0.25))
+        log_messages.append(f"Sondeo Bajo (25%): '{texto_bajo}' (Conf: {conf_bajo:.1f}%)")
+        
+        # Sondeo Flash Alto
+        texto_alto, conf_alto, _ = get_ocr_results_from_image(sim_manager.simulate_lighting(0.75))
+        log_messages.append(f"Sondeo Alto (75%): '{texto_alto}' (Conf: {conf_alto:.1f}%)")
+
+        # El Agente Experto toma su decisión
         ambient_light = np.mean(cv2.cvtColor(initial_frame, cv2.COLOR_BGR2GRAY))
-        observation = np.array([ambient_light / 2.55, 0], dtype=np.float32)
+        observation = np.array([ambient_light / 2.55, conf_bajo, conf_alto], dtype=np.float32)
+        
         action, _ = agente_ppo.predict(observation, deterministic=True)
         fuzzy_controller.tune(action)
-        flash_power = fuzzy_controller.compute(observation[0], 0)
-        intensity = flash_power / 255.0
-        
-        # Enviar comando de flash al simulador
+        flash_power = fuzzy_controller.compute(observation[0], observation[2])
         enviar_comando_arduino(arduino, f"SET_FLASH:{int(flash_power)}")
         
         # Generar y procesar la imagen final
-        final_image = sim_manager.simulate_lighting(intensity)
-        display_frame = cv2.resize(final_image, (800, 600)) # Actualizamos el fondo con la imagen final
+        final_image = sim_manager.simulate_lighting(flash_power / 255.0)
+        display_frame = final_image.copy()
         
-        results = yolo_model(final_image, imgsz=320, conf=0.5, verbose=False)
-        if results and results[0].boxes:
-            box = results[0].boxes[0]
-            roi = final_image[int(box.xyxy[0][1]):int(box.xyxy[0][3]), int(box.xyxy[0][0]):int(box.xyxy[0][2])]
-            roi_to_display = roi.copy() # Guardamos el ROI para mostrarlo
-            
-            texto_placa, confianza = detectar_texto(preprocesar_placa(roi))
+        texto_final, conf_final, roi_final = get_ocr_results_from_image(final_image)
+        roi_to_display = roi_final.copy() if roi_final is not None else None
+        
+        if texto_final:
+            log_messages.append(f"✅ Lectura Final: {texto_final} (Conf: {conf_final:.1f}%)")
+            if verificar_placa_registrada(conn, texto_final):
+                log_messages.append("➡️  Vehículo AUTORIZADO. Abriendo barrera...")
+                enviar_comando_arduino(arduino, "OPEN")
+        else:
+            log_messages.append("❌ No se pudo obtener una lectura final.")
 
-            if texto_placa:
-                vehiculo = verificar_placa_registrada(conn, texto_placa)
-                if vehiculo:
-                    enviar_comando_arduino(arduino, "OPEN") # Enviar comando a la simulación
-                    guardar_en_base_de_datos(conn, texto_placa)
-        
-        # Apagar el "flash" en la simulación después del ciclo
-        time.sleep(1) # Pequeña pausa para ver el resultado
+        time.sleep(1)
         enviar_comando_arduino(arduino, "SET_FLASH:0")
+        log_messages.append("----------------------------")
+        log_messages.append("Presiona 'D' para un nuevo vehículo...")
 
-
-# --- 3. LIMPIEZA ---
-print("Cerrando sistema...")
+# --- LIMPIEZA ---
 cerrar_conexion_arduino(arduino)
-if conn:
-    conn.close()
+if conn: conn.close()
+print("Programa finalizado.")

@@ -8,18 +8,18 @@ import cv2
 # --- VARIABLES GLOBALES PARA LA SIMULACIÓN ---
 SIMULATION_MODE = False
 dashboard = None
-log_messages = ["Presiona 'D' para simular deteccion, 'Q' para salir."]
+log_messages = ["Presiona 'D' para simular, 'Q' para salir."]
 barrier_angle, target_angle = 0, 0
 flash_brightness = 0
 
-# --- CLASE DEL CONTROLADOR DIFUSO (Sin cambios) ---
+# --- CLASE DEL CONTROLADOR DIFUSO ---
 class FuzzyController:
-    # ... (el código de la clase FuzzyController se mantiene exactamente igual) ...
     def __init__(self):
         self.luz_ambiental = ctrl.Antecedent(np.arange(0, 101, 1), 'luz_ambiental')
         self.confianza_ocr = ctrl.Antecedent(np.arange(0, 101, 1), 'confianza_ocr')
         self.potencia_flash = ctrl.Consequent(np.arange(0, 256, 1), 'potencia_flash')
         self.tune([50, 80, 40, 70])
+
     def tune(self, params):
         conf_media_fin, conf_alta_inicio, luz_media_fin, luz_clara_inicio = params
         self.confianza_ocr['baja'] = fuzz.trimf(self.confianza_ocr.universe, [0, 0, conf_media_fin])
@@ -36,6 +36,7 @@ class FuzzyController:
         rule3 = ctrl.Rule(self.confianza_ocr['alta'] | self.luz_ambiental['clara'], self.potencia_flash['baja'])
         self.control_system = ctrl.ControlSystem([rule1, rule2, rule3])
         self.simulation = ctrl.ControlSystemSimulation(self.control_system)
+
     def compute(self, input_luz, input_confianza):
         self.simulation.input['luz_ambiental'] = input_luz
         self.simulation.input['confianza_ocr'] = input_confianza
@@ -45,12 +46,12 @@ class FuzzyController:
         except:
             return 50.0
 
-# --- FUNCIONES DE HARDWARE Y SIMULACIÓN (VERSIÓN CON VISUALIZACIÓN DE ROI) ---
+# --- FUNCIONES DE HARDWARE Y SIMULACIÓN ---
 
 def iniciar_simulador_visual():
     global dashboard
-    dashboard = np.zeros((600, 800, 3), dtype="uint8")
-    cv2.namedWindow("Simulador de Sistema ALPR (OpenCV)")
+    dashboard = np.zeros((720, 1280, 3), dtype="uint8")
+    cv2.namedWindow("Simulador ALPR - Dashboard", cv2.WINDOW_AUTOSIZE)
     print("✅ Modo simulación visual con OpenCV activado.")
 
 def conectar_arduino(port='/dev/ttyACM0', baudrate=9600):
@@ -61,7 +62,7 @@ def conectar_arduino(port='/dev/ttyACM0', baudrate=9600):
         SIMULATION_MODE = False
         print(f"✅ Conexión con Arduino real establecida en {port}.")
         return arduino
-    except (ImportError, serial.SerialException, NameError):
+    except:
         SIMULATION_MODE = True
         print(f"⚠️  No se encontró Arduino. Iniciando simulación visual.")
         iniciar_simulador_visual()
@@ -83,44 +84,49 @@ def enviar_comando_arduino(arduino, comando):
             except:
                 flash_brightness = 0
 
-def actualizar_y_manejar_eventos_simulador(main_frame=None, roi_frame=None):
-    """ Dibuja la simulación y ahora también puede mostrar el ROI."""
-    global barrier_angle, target_angle, flash_brightness, log_messages, dashboard
-    
+def actualizar_y_manejar_eventos_simulador(main_view_frame=None, roi_frame=None):
+    global barrier_angle, target_angle, log_messages
     if not SIMULATION_MODE:
-        if main_frame is not None:
-            cv2.imshow("Deteccion en Vivo", main_frame)
+        if main_view_frame is not None:
+            cv2.imshow("Deteccion en Vivo", main_view_frame)
         if cv2.waitKey(1) & 0xFF == ord('q'): return False
         return True
 
-    # Si se recibe una imagen de ROI, mostrarla en una nueva ventana
-    if roi_frame is not None and roi_frame.size > 0:
-        cv2.imshow("ROI Detectado", roi_frame)
+    dashboard = np.full((720, 1280, 3), 40, dtype=np.uint8)
+    if main_view_frame is not None:
+        h, w, _ = main_view_frame.shape
+        new_h, new_w = 400, int(400 * (w/h))
+        dashboard[40:440, 20:20+new_w] = cv2.resize(main_view_frame, (new_w, new_h))
+    cv2.putText(dashboard, "Vista Principal", (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255,255,255), 2)
     
-    # Lógica de animación
+    if roi_frame is not None and roi_frame.size > 0:
+        roi_resized = cv2.resize(roi_frame, (roi_frame.shape[1]*4, roi_frame.shape[0]*4), interpolation=cv2.INTER_NEAREST)
+        rh, rw, _ = roi_resized.shape
+        dashboard[40:40+rh, 1240-rw:1240] = roi_resized
+    cv2.putText(dashboard, "ROI Detectado", (1240-250, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255,255,255), 2)
+
     if barrier_angle > target_angle: barrier_angle -= 3
     if barrier_angle < -90: target_angle = 0
-
-    # Dibujar dashboard
-    dashboard.fill(50)
-    # ... (resto de la lógica de dibujo es igual)
-    cv2.rectangle(dashboard, (375, 500), (425, 550), (0, 0, 0), -1)
     rad = np.deg2rad(barrier_angle)
-    end_x = int(400 + 350 * np.cos(rad))
-    end_y = int(525 + 350 * np.sin(rad))
-    cv2.line(dashboard, (400, 525), (end_x, end_y), (80, 80, 255), 15)
-    flash_color = (0, flash_brightness, flash_brightness)
-    cv2.circle(dashboard, (50, 50), 30, flash_color, -1)
-    for i, msg in enumerate(log_messages[-15:]):
-        cv2.putText(dashboard, msg, (20, 20 + i * 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-        
-    cv2.imshow("Simulador de Sistema ALPR (OpenCV)", dashboard)
+    end_x = int(1000 + 250 * np.cos(rad))
+    end_y = int(550 + 250 * np.sin(rad))
+    cv2.rectangle(dashboard, (975, 525), (1025, 575), (0, 0, 0), -1)
+    cv2.line(dashboard, (1000, 550), (end_x, end_y), (80, 80, 255), 20)
+    
+    for i, msg in enumerate(log_messages[-8:]):
+        cv2.putText(dashboard, msg, (20, 510 + i * 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-    if cv2.waitKey(1) & 0xFF == ord('q'): return False
+    cv2.imshow("Simulador ALPR - Dashboard", dashboard)
+    if cv2.waitKey(1) & 0xFF == ord('q') or cv2.getWindowProperty("Simulador ALPR - Dashboard", cv2.WND_PROP_VISIBLE) < 1:
+        return False
     return True
 
 def cerrar_conexion_arduino(arduino):
+    """
+    Cierra la conexión con el Arduino o las ventanas de simulación.
+    """
     if not SIMULATION_MODE:
         if arduino and 'is_open' in dir(arduino) and arduino.is_open:
             arduino.close()
+            print("Conexión con Arduino real cerrada.")
     cv2.destroyAllWindows()
