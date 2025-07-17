@@ -2,6 +2,7 @@ import cv2
 import time
 import numpy as np
 import os
+import tkinter as tk
 from ultralytics import YOLO
 from stable_baselines3 import PPO
 
@@ -11,6 +12,7 @@ from arduino_python import FuzzyController, conectar_arduino, enviar_comando_ard
 from database_sql import conectar_sql_server, verificar_placa_registrada, guardar_en_base_de_datos
 from preprocesamiento import preprocesar_placa, detectar_texto
 from simulation_manager import SimulationManager
+from login import mostrar_login
 
 # --- 1. SETUP ---
 print("⚙️  Iniciando sistema en MODO SIMULACIÓN...")
@@ -38,6 +40,10 @@ running = True
 # Variables para mantener el estado de la visualización
 display_frame = np.zeros((600, 800, 3), dtype="uint8") # Fondo por defecto
 roi_to_display = None
+
+root = tk.Tk()
+root.withdraw()  # Oculta la ventana principal hasta que se active el login
+mostrar_login(root)
 
 print("🚀 Sistema listo. Presiona 'D' para simular o 'Q' para salir.")
 
